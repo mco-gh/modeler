@@ -1,0 +1,5 @@
+{
+  "name": "Modélisateur",
+  "description": "Un outil pour les étudiants en art permettant de visualiser la progression d'une sculpture en argile, de l'ébauche à l'œuvre finale.",
+  "requestFramePermissions": []
+}
