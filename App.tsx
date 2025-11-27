@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { StageCard } from './components/StageCard';
 import { InputSection } from './components/InputSection';
@@ -74,8 +75,10 @@ export default function App() {
     }
   };
 
-  const handleGenerate = useCallback(async () => {
-    if (!prompt.trim() || isGenerating) return;
+  const handleGenerate = useCallback(async (inputImageBase64?: string) => {
+    if (isGenerating) return;
+    // If no text prompt and no image, return
+    if (!inputImageBase64 && !prompt.trim()) return;
 
     setIsGenerating(true);
 
@@ -89,9 +92,10 @@ export default function App() {
     try {
       // STEP 1: Generate the Final Product (Stage 4) first
       // This establishes the "truth" for the sculpture's look
+      // If we have an input image, we pass it here to inspire the final look.
       let finalImageBase64: string;
       try {
-        finalImageBase64 = await generateStageImage(prompt, 4);
+        finalImageBase64 = await generateStageImage(prompt, 4, undefined, inputImageBase64);
         
         setStages(currentStages => 
           currentStages.map(s => 
@@ -114,6 +118,7 @@ export default function App() {
       const previousStageIds = [1, 2, 3];
       const stagePromises = previousStageIds.map(async (id) => {
         try {
+          // Pass the GENERATED final image as reference for the previous stages
           const image = await generateStageImage(prompt, id, finalImageBase64);
           
           setStages(currentStages => 
