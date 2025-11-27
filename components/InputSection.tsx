@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Image as ImageIcon, Type, Upload, X } from 'lucide-react';
+import { Sparkles, Image as ImageIcon, Type, Upload, X, Clipboard } from 'lucide-react';
 
 interface InputSectionProps {
   prompt: string;
@@ -47,6 +47,32 @@ export const InputSection: React.FC<InputSectionProps> = ({
       window.removeEventListener('paste', handlePaste);
     };
   }, [mode]);
+
+  const handleClipboardRead = async () => {
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      let imageFound = false;
+      for (const clipboardItem of clipboardItems) {
+        const imageType = clipboardItem.types.find(type => type.startsWith('image/'));
+        if (imageType) {
+          const blob = await clipboardItem.getType(imageType);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setSelectedImage(reader.result as string);
+          };
+          reader.readAsDataURL(blob);
+          imageFound = true;
+          break;
+        }
+      }
+      if (!imageFound) {
+        alert("Aucune image trouvée dans le presse-papiers.");
+      }
+    } catch (err) {
+      console.error("Erreur lors de la lecture du presse-papiers:", err);
+      alert("Impossible d'accéder au presse-papiers. Vérifiez les permissions de votre navigateur.");
+    }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -157,8 +183,19 @@ export const InputSection: React.FC<InputSectionProps> = ({
               <div className="w-12 h-12 bg-clay-100 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Upload className="w-6 h-6 text-clay-500" />
               </div>
-              <p className="text-clay-600 font-medium">Cliquez ou collez (Ctrl+V) pour ajouter une image</p>
-              <p className="text-clay-400 text-xs mt-1">JPG, PNG supportés</p>
+              <p className="text-clay-600 font-medium">Cliquez pour ajouter une image</p>
+              <p className="text-clay-400 text-xs mt-1 mb-4">JPG, PNG supportés</p>
+
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleClipboardRead();
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-clay-200 rounded-lg text-sm text-clay-600 hover:bg-clay-50 hover:text-clay-900 transition-colors shadow-sm"
+              >
+                <Clipboard className="w-4 h-4" />
+                Coller du presse-papiers
+              </button>
             </div>
           ) : (
             <div className="relative rounded-xl overflow-hidden bg-clay-50 border border-clay-200">
