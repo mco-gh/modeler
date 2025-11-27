@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Image as ImageIcon, Type, Upload, X } from 'lucide-react';
 
 interface InputSectionProps {
@@ -18,6 +18,35 @@ export const InputSection: React.FC<InputSectionProps> = ({
   const [mode, setMode] = useState<'text' | 'image'>('text');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (mode !== 'image') return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              setSelectedImage(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+            e.preventDefault();
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => {
+      window.removeEventListener('paste', handlePaste);
+    };
+  }, [mode]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -128,7 +157,7 @@ export const InputSection: React.FC<InputSectionProps> = ({
               <div className="w-12 h-12 bg-clay-100 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Upload className="w-6 h-6 text-clay-500" />
               </div>
-              <p className="text-clay-600 font-medium">Cliquez pour téléverser une image</p>
+              <p className="text-clay-600 font-medium">Cliquez ou collez (Ctrl+V) pour ajouter une image</p>
               <p className="text-clay-400 text-xs mt-1">JPG, PNG supportés</p>
             </div>
           ) : (
