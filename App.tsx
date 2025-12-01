@@ -290,7 +290,7 @@ export default function App() {
           </button>
 
           {/* Left Navigation Arrow */}
-          {activeExpandedStage.id > 1 && (
+          {expandedStageId && expandedStageId > 1 && (
             <button
               onClick={prevStage}
               className="absolute left-4 md:left-8 p-3 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all backdrop-blur-sm z-20 hover:scale-110"
@@ -301,7 +301,7 @@ export default function App() {
           )}
 
           {/* Right Navigation Arrow */}
-          {activeExpandedStage.id < 4 && (
+          {expandedStageId && expandedStageId < 4 && (
             <button
               onClick={nextStage}
               className="absolute right-4 md:right-8 p-3 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all backdrop-blur-sm z-20 hover:scale-110"
@@ -341,7 +341,7 @@ export default function App() {
 
             <div className="mt-6 text-center">
               <div className="inline-block px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white/90 text-sm font-medium mb-2 backdrop-blur-sm">
-                Étape {activeExpandedStage.id} / 4
+                Étape {expandedStageId} / 4
               </div>
               <h2 className="text-white text-2xl font-serif font-medium tracking-wide">
                 {activeExpandedStage.label}
