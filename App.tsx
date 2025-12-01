@@ -4,7 +4,7 @@ import { StageCard } from './components/StageCard';
 import { InputSection } from './components/InputSection';
 import { SculptureStage, StageStatus } from './types';
 import { generateStageImage } from './services/geminiService';
-import { Palette, Loader2, Key, ExternalLink } from 'lucide-react';
+import { Palette, Loader2, Key, ExternalLink, ChevronLeft, ChevronRight, X, AlertCircle } from 'lucide-react';
 
 // Initial state for the 4 stages
 const INITIAL_STAGES: SculptureStage[] = [
@@ -40,6 +40,9 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [apiKeyReady, setApiKeyReady] = useState(false);
   const [checkingKey, setCheckingKey] = useState(true);
+  
+  // Gallery Overlay State
+  const [expandedStageId, setExpandedStageId] = useState<number | null>(null);
 
   // Check for API Key on mount
   useEffect(() => {
@@ -91,8 +94,6 @@ export default function App() {
 
     try {
       // STEP 1: Generate the Final Product (Stage 4) first
-      // This establishes the "truth" for the sculpture's look
-      // If we have an input image, we pass it here to inspire the final look.
       let finalImageBase64: string;
       try {
         finalImageBase64 = await generateStageImage(prompt, 4, undefined, inputImageBase64);
@@ -114,7 +115,6 @@ export default function App() {
       }
 
       // STEP 2: Generate Stages 1, 2, 3 using Stage 4 as reference
-      // This ensures consistency in pose and composition
       const previousStageIds = [1, 2, 3];
       const stagePromises = previousStageIds.map(async (id) => {
         try {
@@ -147,6 +147,46 @@ export default function App() {
       setIsGenerating(false);
     }
   }, [prompt, isGenerating]);
+
+  // Navigation Logic
+  const nextStage = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setExpandedStageId(prev => (prev !== null && prev < 4 ? prev + 1 : prev));
+  }, []);
+
+  const prevStage = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setExpandedStageId(prev => (prev !== null && prev > 1 ? prev - 1 : prev));
+  }, []);
+
+  const closeExpanded = useCallback(() => {
+    setExpandedStageId(null);
+  }, []);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (expandedStageId === null) return;
+      
+      switch (e.key) {
+        case 'ArrowRight':
+          nextStage();
+          break;
+        case 'ArrowLeft':
+          prevStage();
+          break;
+        case 'Escape':
+          closeExpanded();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [expandedStageId, nextStage, prevStage, closeExpanded]);
+
+  // Find the currently active stage for the overlay
+  const activeExpandedStage = expandedStageId ? stages.find(s => s.id === expandedStageId) : null;
 
   if (checkingKey) {
     return (
@@ -219,15 +259,100 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
           {stages.map((stage) => (
-            <StageCard key={stage.id} stage={stage} />
+            <StageCard 
+              key={stage.id} 
+              stage={stage} 
+              onExpand={() => setExpandedStageId(stage.id)}
+            />
           ))}
         </div>
       </main>
 
       <footer className="mt-20 text-center text-clay-400 text-sm pb-8 px-6">
         <p>Les images sont générées par IA (Gemini 3 Pro Image). Le processus commence par l'œuvre finale, puis déduit les étapes antérieures pour assurer la cohérence.</p>
-        <p className="mt-2 opacity-50">&copy; {new Date().getFullYear()} Modélisateur. Tous droits réservés.</p>
+        <p className="mt-2 opacity-50">
+          &copy; 2025, 2026 <a href="https://mco.dev" target="_blank" rel="noopener noreferrer" className="hover:text-clay-600 transition-colors">Marc Cohen</a>. Tous droits réservés.
+        </p>
       </footer>
+
+      {/* Full Screen Overlay */}
+      {activeExpandedStage && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-clay-900/95 backdrop-blur-md animate-in fade-in duration-300"
+          onClick={closeExpanded}
+        >
+          {/* Close Button */}
+          <button 
+            onClick={closeExpanded}
+            className="absolute top-4 right-4 p-2 text-white/70 hover:text-white bg-black/20 hover:bg-black/40 rounded-full transition-colors backdrop-blur-sm z-20"
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          {/* Left Navigation Arrow */}
+          {activeExpandedStage.id > 1 && (
+            <button
+              onClick={prevStage}
+              className="absolute left-4 md:left-8 p-3 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all backdrop-blur-sm z-20 hover:scale-110"
+              aria-label="Previous Stage"
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </button>
+          )}
+
+          {/* Right Navigation Arrow */}
+          {activeExpandedStage.id < 4 && (
+            <button
+              onClick={nextStage}
+              className="absolute right-4 md:right-8 p-3 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all backdrop-blur-sm z-20 hover:scale-110"
+              aria-label="Next Stage"
+            >
+              <ChevronRight className="w-8 h-8" />
+            </button>
+          )}
+
+          {/* Content Area */}
+          <div 
+            className="relative max-w-full max-h-full flex flex-col items-center justify-center p-4 sm:p-12"
+            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking content
+          >
+            {activeExpandedStage.status === StageStatus.SUCCESS && activeExpandedStage.imageUrl ? (
+              <img
+                src={activeExpandedStage.imageUrl}
+                alt={activeExpandedStage.label}
+                className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300"
+              />
+            ) : activeExpandedStage.status === StageStatus.LOADING ? (
+              <div className="flex flex-col items-center justify-center text-white/80">
+                <Loader2 className="w-16 h-16 animate-spin mb-4" />
+                <p className="text-xl font-light tracking-wide">Sculpture en cours...</p>
+              </div>
+            ) : activeExpandedStage.status === StageStatus.ERROR ? (
+              <div className="flex flex-col items-center justify-center text-red-200">
+                <AlertCircle className="w-16 h-16 mb-4 opacity-80" />
+                <p className="text-xl font-light">Image non disponible</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center text-white/50">
+                <Palette className="w-16 h-16 mb-4 opacity-50" />
+                <p className="text-xl font-light">En attente...</p>
+              </div>
+            )}
+
+            <div className="mt-6 text-center">
+              <div className="inline-block px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white/90 text-sm font-medium mb-2 backdrop-blur-sm">
+                Étape {activeExpandedStage.id} / 4
+              </div>
+              <h2 className="text-white text-2xl font-serif font-medium tracking-wide">
+                {activeExpandedStage.label}
+              </h2>
+              <p className="text-white/60 mt-1 max-w-lg mx-auto text-sm">
+                {activeExpandedStage.description}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
