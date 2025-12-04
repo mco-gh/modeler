@@ -4,7 +4,8 @@ import { StageCard } from './components/StageCard';
 import { InputSection } from './components/InputSection';
 import { SculptureStage, StageStatus } from './types';
 import { generateStageImage } from './services/geminiService';
-import { Palette, Loader2, Key, ExternalLink, ChevronLeft, ChevronRight, X, AlertCircle } from 'lucide-react';
+import { Palette, Loader2, Key, ExternalLink, ChevronLeft, ChevronRight, X, AlertCircle, Download } from 'lucide-react';
+import { jsPDF } from "jspdf";
 
 // Initial state for the 4 stages
 const INITIAL_STAGES: SculptureStage[] = [
@@ -38,6 +39,7 @@ export default function App() {
   const [prompt, setPrompt] = useState<string>('');
   const [stages, setStages] = useState<SculptureStage[]>(INITIAL_STAGES);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [apiKeyReady, setApiKeyReady] = useState(false);
   const [checkingKey, setCheckingKey] = useState(true);
   
@@ -84,6 +86,9 @@ export default function App() {
     if (!inputImageBase64 && !prompt.trim()) return;
 
     setIsGenerating(true);
+    if (inputImageBase64) {
+        setReferenceImage(inputImageBase64);
+    }
 
     // Reset all stages to loading
     setStages(prev => prev.map(stage => ({
@@ -148,6 +153,91 @@ export default function App() {
     }
   }, [prompt, isGenerating]);
 
+  // Export PDF Logic
+  const handleExportPDF = useCallback(() => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const availableWidth = pageWidth - (margin * 2);
+    
+    // Header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(66, 56, 51); // clay-900 equivalent
+    doc.text("Modélisateur", pageWidth / 2, 20, { align: "center" });
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.setTextColor(114, 95, 82); // clay-600
+    doc.text("Rapport de Progression de Sculpture", pageWidth / 2, 28, { align: "center" });
+    
+    const dateStr = new Date().toLocaleDateString('fr-FR', { 
+      year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+    });
+    doc.setFontSize(10);
+    doc.text(dateStr, pageWidth / 2, 34, { align: "center" });
+
+    // Prompt
+    if (prompt) {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      const splitPrompt = doc.splitTextToSize(`" ${prompt} "`, availableWidth);
+      doc.text(splitPrompt, margin, 45);
+    }
+
+    // Images Grid
+    const startY = prompt ? 55 : 45;
+    const gap = 10;
+    const imgSize = (availableWidth - gap) / 2; // 2 columns
+    
+    // Positions for 2x2 grid
+    const positions = [
+      { x: margin, y: startY }, // Top Left
+      { x: margin + imgSize + gap, y: startY }, // Top Right
+      { x: margin, y: startY + imgSize + 30 }, // Bottom Left
+      { x: margin + imgSize + gap, y: startY + imgSize + 30 } // Bottom Right
+    ];
+
+    stages.forEach((stage, index) => {
+      const pos = positions[index];
+      if (!pos) return;
+
+      // Draw box background for context
+      doc.setFillColor(249, 247, 245); // clay-50
+      doc.setDrawColor(220, 213, 205); // clay-200
+      doc.rect(pos.x, pos.y, imgSize, imgSize + 25, 'FD');
+
+      // Add Image
+      if (stage.status === StageStatus.SUCCESS && stage.imageUrl) {
+        try {
+          doc.addImage(stage.imageUrl, 'PNG', pos.x, pos.y, imgSize, imgSize, undefined, 'FAST');
+        } catch (e) {
+          console.error("Error adding image to PDF", e);
+        }
+      } else {
+        // Placeholder text if missing
+        doc.setFontSize(10);
+        doc.setTextColor(150);
+        doc.text("Image non disponible", pos.x + imgSize/2, pos.y + imgSize/2, { align: "center" });
+      }
+
+      // Add Labels
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(66, 56, 51);
+      doc.text(stage.label, pos.x + 5, pos.y + imgSize + 8);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(114, 95, 82);
+      const splitDesc = doc.splitTextToSize(stage.description, imgSize - 10);
+      doc.text(splitDesc, pos.x + 5, pos.y + imgSize + 14);
+    });
+
+    doc.save("sculpture-progression.pdf");
+  }, [stages, prompt]);
+
   // Navigation Logic
   const nextStage = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -187,6 +277,7 @@ export default function App() {
 
   // Find the currently active stage for the overlay
   const activeExpandedStage = expandedStageId ? stages.find(s => s.id === expandedStageId) : null;
+  const hasGeneratedContent = stages.some(s => s.status === StageStatus.SUCCESS);
 
   if (checkingKey) {
     return (
@@ -257,6 +348,18 @@ export default function App() {
       </div>
 
       <main className="max-w-7xl mx-auto px-6">
+        {hasGeneratedContent && (
+          <div className="flex justify-end mb-6">
+            <button
+              onClick={handleExportPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-clay-200 rounded-lg text-sm font-medium text-clay-700 hover:bg-clay-50 hover:text-clay-900 hover:border-clay-300 transition-all shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              Exporter en PDF
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
           {stages.map((stage) => (
             <StageCard 
